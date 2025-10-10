@@ -13,7 +13,7 @@ const ITEMS_PER_PAGE = 10;
 
 // Axios instance with adminToken
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com',
+  baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' }
 });
 

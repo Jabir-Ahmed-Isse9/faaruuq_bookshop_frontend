@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import API from '../api';
-import { Link } from 'react-router-dom'; // ✅ IMPORT LINK INSTEAD OF useNavigate
+import { Link } from 'react-router-dom';
 
 const CartSidebar = ({ isOpen, onClose, cartData }) => {
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [couponCode, setCouponCode] = useState(''); // ✅ New state for coupon
+  const [couponError, setCouponError] = useState(''); // ✅ New state for coupon error
 
   useEffect(() => {
     if (cartData) {
@@ -31,6 +33,27 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
       setError('Failed to load cart. Please log in.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ NEW: Apply Coupon Function
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+
+    try {
+      setCouponError('');
+      const res = await API.post('/api/v1/cart/coupon', {
+        code: couponCode.trim()
+      });
+      setCart(res.data);
+      alert('Coupon applied successfully!');
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || 'Failed to apply coupon';
+      setCouponError(errorMsg);
+      alert(errorMsg);
     }
   };
 
@@ -68,13 +91,13 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
 
   return (
     <>
-      {/* Overlay — Click to close */}
+      {/* Overlay */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
         onClick={onClose}
       ></div>
 
-      {/* Sidebar Panel */}
+      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 right-0 w-96 shadow-2xl transform transition-transform duration-500 ease-in-out z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -94,14 +117,14 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
             </button>
           </div>
 
-          {/* Loading State */}
+          {/* Loading */}
           {loading && (
             <div className="flex-1 p-5 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
             </div>
           )}
 
-          {/* Error State */}
+          {/* Error */}
           {error && (
             <div className="flex-1 p-5 flex items-center justify-center">
               <p className="text-red-600 bg-red-50 dark:bg-red-900/30 px-4 py-3 rounded-lg text-center dark:text-red-400">
@@ -110,7 +133,7 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
             </div>
           )}
 
-          {/* Cart Items */}
+          {/* Items */}
           {!loading && !error && (
             <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50 dark:bg-gray-800">
               {cart?.items?.length === 0 ? (
@@ -153,7 +176,7 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
                           {title}
                         </h3>
                         <p className="text-blue-600 dark:text-blue-400 font-bold mt-1">
-                          ETB {parseFloat(price).toFixed(2)}
+                          $ {parseFloat(price).toFixed(2)}
                         </p>
                         <div className="flex items-center mt-2 gap-3">
                           <button
@@ -187,19 +210,48 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
             </div>
           )}
 
+          {/* Coupon Section */}
+          {/* {!loading && !error && cart && cart.items.length > 0 && (
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  placeholder="Enter coupon code"
+                  className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                />
+                <button
+                  onClick={applyCoupon}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                >
+                  Apply
+                </button>
+              </div>
+              {couponError && (
+                <p className="text-red-500 text-sm mt-2">{couponError}</p>
+              )}
+              {cart.discount > 0 && (
+                <p className="text-green-600 dark:text-green-400 text-sm mt-2">
+                  ✓ Coupon applied! You saved ETB {parseFloat(cart.discount).toFixed(2)}
+                </p>
+              )}
+            </div>
+          )} */}
+
           {/* Footer */}
           {!loading && !error && cart && (
             <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
               <div className="space-y-2 mb-4 text-sm text-gray-600 dark:text-gray-400">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>ETB {parseFloat(cart.subtotal || 0).toFixed(2)}</span>
+                  <span>$ {parseFloat(cart.subtotal || 0).toFixed(2)}</span>
                 </div>
                 {cart.discount > 0 && (
                   <div className="flex justify-between">
                     <span>Discount</span>
                     <span className="text-green-600 dark:text-green-400">
-                      -ETB {parseFloat(cart.discount).toFixed(2)}
+                      $ {parseFloat(cart.discount).toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -210,12 +262,11 @@ const CartSidebar = ({ isOpen, onClose, cartData }) => {
                 <div className="flex justify-between font-medium text-gray-800 dark:text-gray-200 border-t pt-2 mt-1">
                   <span>Total</span>
                   <span className="text-blue-600 dark:text-blue-400 font-bold">
-                    ETB {parseFloat(cart.total || 0).toFixed(2)}
+                    $ {parseFloat(cart.total || 0).toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              {/* ✅ CHANGED TO <Link> — THIS IS THE KEY CHANGE */}
               <Link
                 to="/checkout"
                 className="w-full bg-gradient-to-r from-blue-800 to-blue-900 text-white py-3 rounded-xl hover:from-blue-900 hover:to-blue-950 transition font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"

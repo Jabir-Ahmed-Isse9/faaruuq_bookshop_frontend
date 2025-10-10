@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+// src/components/AddCategoryForm.jsx
+import { useState, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
-// Configure Axios instance — NO hardcoded token, NO typo in URL
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com', // ✅ Fixed URL — no spaces!
+  baseURL: import.meta.env.VITE_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Inject token dynamically from localStorage
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -19,12 +19,10 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle expired/invalid token globally
 API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired — clear storage and redirect
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -38,14 +36,11 @@ const AddCategoryForm = ({ onAddCategory, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 👇 Track if component is mounted to prevent state updates on unmounted components
   const isMounted = useRef(true);
 
-  useEffect(() => {
-    return () => {
-      isMounted.current = false; // Cleanup on unmount
-    };
-  }, []);
+  // Cleanup on unmount
+  // (Not strictly needed here since form is short-lived, but safe)
+  // useEffect(() => () => { isMounted.current = false; }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -57,6 +52,7 @@ const AddCategoryForm = ({ onAddCategory, onCancel }) => {
 
     if (!trimmedName) {
       setError('Category name is required');
+      toast.warning('⚠️ Category name is required!');
       return;
     }
 
@@ -70,36 +66,27 @@ const AddCategoryForm = ({ onAddCategory, onCancel }) => {
         slug,
       });
 
-      // ✅ Only proceed if response is 201
       if (response.status === 201) {
-        // 👇 Only update state if component is still mounted
-        if (isMounted.current) {
-          // Wrap onAddCategory in try-catch to prevent its errors from bubbling up
-          try {
-            onAddCategory(response.data); // This might cause error if parent has issues
-          } catch (callbackError) {
-            console.warn('onAddCategory callback error:', callbackError);
-            // Don't show user-facing error — backend succeeded
-          }
-          setFormData({ name: '' });
-        }
+        // Notify parent to refetch categories and close modal
+        onAddCategory(); // ✅ No argument needed
+        setFormData({ name: '' });
+        toast.success('🎉 Category added successfully!');
       } else {
         throw new Error(`Unexpected status: ${response.status}`);
       }
     } catch (err) {
       console.error('API Error:', err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        'Failed to add category. Please try again.';
 
-      // 👇 Only show error to user if component is mounted
       if (isMounted.current) {
-        setError(
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.message ||
-          'Failed to add category. Please try again.'
-        );
+        setError(errorMessage);
+        toast.error(`❌ ${errorMessage}`);
       }
     } finally {
-      // 👇 Only update loading state if component is mounted
       if (isMounted.current) {
         setLoading(false);
       }

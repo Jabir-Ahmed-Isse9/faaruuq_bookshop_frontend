@@ -1,25 +1,20 @@
+// src/updates/updateCategory.jsx (or wherever your file is)
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
-// ✅✅✅ FIXED: NO TRAILING SPACES + TOKEN INTERCEPTOR
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com', // 🚫 REMOVED TRAILING SPACES
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// ✅ Inject token
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ✅ Handle 401
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -33,13 +28,21 @@ API.interceptors.response.use(
 );
 
 const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
-  const [formData, setFormData] = useState({ name: category.name });
+  // ✅ Initialize with both name and language
+  const [formData, setFormData] = useState({
+    name: category.name || '',
+    language: category.language || '', // ✅ Add language
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Sync with prop if category changes
   useEffect(() => {
-    setFormData({ name: category.name });
-  }, [category.name]);
+    setFormData({
+      name: category.name || '',
+      language: category.language || '',
+    });
+  }, [category]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -48,9 +51,20 @@ const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmedName = formData.name.trim();
+    const trimmedLanguage = formData.language.trim();
 
+    // ✅ Validate both fields (adjust if language is optional)
     if (!trimmedName) {
-      setError('Category name is required');
+      const msg = 'Category name is required';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (!trimmedLanguage) {
+      const msg = 'Language is required';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -62,21 +76,24 @@ const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
       const response = await API.put(`/api/v1/categories/${category._id}`, {
         name: trimmedName,
         slug,
+        language: trimmedLanguage, // ✅ Send language to backend
       });
 
       if (response.status === 200) {
-        onUpdate(response.data);
+        onUpdate(response.data); // Parent updates local state
         onCancel();
+        toast.success('✅ Category updated successfully!');
       } else {
         throw new Error(`Unexpected status: ${response.status}`);
       }
     } catch (err) {
       console.error('Update error:', err);
-      setError(
+      const message =
         err.response?.data?.message ||
         err.response?.data?.error ||
-        'Failed to update category. Please try again.'
-      );
+        'Failed to update category. Please try again.';
+      setError(message);
+      toast.error(`❌ ${message}`);
     } finally {
       setLoading(false);
     }
@@ -98,6 +115,7 @@ const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Name */}
         <div>
           <label
             htmlFor="categoryName"
@@ -113,7 +131,31 @@ const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
             onChange={handleChange}
             required
             placeholder="e.g. Science, History, Fiction"
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg 
+                       focus:ring-indigo-500 focus:border-indigo-500 
+                       dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          />
+        </div>
+
+        {/* ✅ Language Input */}
+        <div>
+          <label
+            htmlFor="categoryLanguage"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Language
+          </label>
+          <input
+            id="categoryLanguage"
+            type="text"
+            name="language"
+            value={formData.language}
+            onChange={handleChange}
+            required
+            placeholder="e.g. English, Spanish, French"
+            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg 
+                       focus:ring-indigo-500 focus:border-indigo-500 
+                       dark:bg-gray-700 dark:text-white dark:border-gray-600"
           />
         </div>
 
@@ -124,7 +166,8 @@ const UpdateCategoryForm = ({ category, onUpdate, onCancel }) => {
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition disabled:opacity-70"
+            className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg 
+                       hover:bg-gray-400 transition disabled:opacity-70"
           >
             Cancel
           </button>

@@ -1,36 +1,34 @@
+// src/pages/Categories.jsx
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  PencilIcon, 
-  TrashIcon, 
-  MagnifyingGlassIcon, 
+import {
+  PencilIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
   PlusIcon
 } from '@heroicons/react/24/outline';
 import AddCategoryForm from '../components/addCategory';
-import UpdateCategoryForm from '../updates/updateCategory'; // ✅ Imported
+import UpdateCategoryForm from '../updates/updateCategory';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const ITEMS_PER_PAGE = 5;
 
-// ✅✅✅ FIXED: NO TRAILING SPACES + TOKEN INTERCEPTOR
+// ✅ Axios setup
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com', // 🚫 REMOVED TRAILING SPACES
+  baseURL: import.meta.env.VITE_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ✅ Inject token from localStorage
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ✅ Handle 401 — auto logout
 API.interceptors.response.use(
-  (response) => response,
+  (res) => res,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
@@ -45,29 +43,29 @@ const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingCategory, setEditingCategory] = useState(null); // ✅ For modal
+  const [editingCategory, setEditingCategory] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  // Fetch categories on mount
+  // Fetch categories
+  const fetchCategories = async () => {
+    setLoading(true);
+    try {
+      const res = await API.get('/api/v1/categories');
+      setCategories(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      toast.error('Failed to load categories. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await API.get('/api/v1/categories');
-        setCategories(Array.isArray(res.data) ? res.data : []);
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setError('Failed to load categories. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchCategories();
   }, []);
 
-  // Filter categories
+  // Filter & paginate
   const filteredCategories = useMemo(() => {
     return categories.filter(category =>
       category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,7 +73,6 @@ const Categories = () => {
     );
   }, [categories, searchTerm]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredCategories.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedCategories = filteredCategories.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -84,38 +81,29 @@ const Categories = () => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  // ✅ Handle delete
+  // Delete category
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this category?")) return;
-
     try {
       await API.delete(`/api/v1/categories/${id}`);
-      setCategories(prev => prev.filter(c => c._id !== id));
-      setError('');
+      toast.success('Category deleted successfully!');
+      fetchCategories(); // ✅ Refetch to stay in sync
     } catch (err) {
       console.error("Delete error:", err);
-      setError('Failed to delete category. It may be in use.');
+      toast.error('Failed to delete category. It may be in use.');
     }
   };
 
-  // ✅ Handle edit — open modal
-  const startEdit = (id) => {
-    const category = categories.find(c => c._id === id);
-    if (category) {
-      setEditingCategory(category);
-    }
-  };
-
-  // ✅ Handle add
-  const handleAddCategory = async (newCategory) => {
+  // ✅ NEW: Refetch after adding
+  const handleAddCategory = async () => {
     try {
-      const res = await API.post('/api/v1/categories', newCategory);
-      setCategories(prev => [...prev, res.data]);
-      setShowAddForm(false);
-      setError('');
+      await fetchCategories(); // ✅ Full refresh
+      toast.success('🎉 Category added successfully!');
     } catch (err) {
-      console.error("Add error:", err);
-      setError('Failed to add category. Name may already exist.');
+      // fetchCategories already shows error, but we still close modal
+      console.error('Refetch failed after add:', err);
+    } finally {
+      setShowAddForm(false); // ✅ Close modal immediately
     }
   };
 
@@ -131,17 +119,11 @@ const Categories = () => {
     <div className="space-y-6">
       <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Categories Management</h2>
 
-      {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Add New Category Button */}
+      {/* Add Button */}
       <div className="flex justify-end">
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors duration-200"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition"
         >
           <PlusIcon className="w-5 h-5" />
           Add New Category
@@ -153,7 +135,7 @@ const Categories = () => {
         <MagnifyingGlassIcon className="w-5 h-5 text-gray-500" />
         <input
           type="text"
-          placeholder="Search categories by name or slug..."
+          placeholder="Search categories..."
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
@@ -163,7 +145,7 @@ const Categories = () => {
         />
       </div>
 
-      {/* Categories Table */}
+      {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -176,24 +158,20 @@ const Categories = () => {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {paginatedCategories.map(category => (
-                <tr key={category._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td className="px-6 py-4 max-w-xs break-words">
-                    {category.name}
-                  </td>
+                <tr key={category._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                  <td className="px-6 py-4 max-w-xs break-words">{category.name}</td>
                   <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{category.slug}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => startEdit(category._id)}
-                        className="p-2 rounded text-indigo-600 hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors"
-                        aria-label="Edit category"
+                        onClick={() => setEditingCategory(category)}
+                        className="p-2 rounded text-indigo-600 hover:bg-indigo-50 dark:hover:bg-gray-700"
                       >
                         <PencilIcon className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(category._id)}
-                        className="p-2 rounded text-red-600 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors"
-                        aria-label="Delete category"
+                        className="p-2 rounded text-red-600 hover:bg-red-50 dark:hover:bg-gray-700"
                       >
                         <TrashIcon className="w-5 h-5" />
                       </button>
@@ -219,7 +197,7 @@ const Categories = () => {
           <button
             disabled={currentPage === 1}
             onClick={() => goToPage(currentPage - 1)}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
           >
             Previous
           </button>
@@ -229,7 +207,7 @@ const Categories = () => {
           <button
             disabled={currentPage === totalPages}
             onClick={() => goToPage(currentPage + 1)}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-600"
           >
             Next
           </button>
@@ -255,7 +233,7 @@ const Categories = () => {
         </div>
       )}
 
-      {/* ✅ Update Category Modal */}
+      {/* Update Category Modal */}
       {editingCategory && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg w-full max-w-md relative">
@@ -269,10 +247,11 @@ const Categories = () => {
             <UpdateCategoryForm
               category={editingCategory}
               onUpdate={(updatedCategory) => {
-                setCategories(prev => 
+                setCategories(prev =>
                   prev.map(c => c._id === updatedCategory._id ? updatedCategory : c)
                 );
                 setEditingCategory(null);
+                toast.success('Category updated successfully!');
               }}
               onCancel={() => setEditingCategory(null)}
             />

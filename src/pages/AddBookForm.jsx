@@ -1,19 +1,17 @@
+// src/components/AddBookForm.jsx
+
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
-// Configure API (same as Books.js)
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
 });
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -21,236 +19,302 @@ const AddBookForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     title: '',
     author: '',
+    description: '',
     price: '',
+    costPrice: '',
     stock: '',
+    language: '',
+    productType: 'books',
+    status: 'active',
   });
-  const [selectedCategories, setSelectedCategories] = useState([]); // ✅ Array of category IDs
-  const [categories, setCategories] = useState([]); // ✅ Fetched from backend
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [coverImage, setCoverImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [error, setError] = useState('');
   const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // ✅ Fetch categories on mount
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await API.get('/api/v1/categories');
         setCategories(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
-        console.error("Failed to load categories:", err);
-        setError('Failed to load categories. Please refresh.');
+        toast.error('Failed to load categories.');
       } finally {
         setLoadingCategories(false);
       }
     };
-
     fetchCategories();
   }, []);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleCategoryChange = (e) => {
-    const options = e.target.options;
-    const selected = [];
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].selected) {
-        selected.push(options[i].value);
-      }
-    }
+    const selected = Array.from(e.target.selectedOptions, (option) => option.value);
     setSelectedCategories(selected);
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Please select a valid image file.');
-        setCoverImage(null);
-        setPreviewUrl(null);
-        return;
-      }
-      setCoverImage(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setError('');
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file.');
+      setCoverImage(null);
+      setPreviewUrl(null);
+      return;
     }
+    setCoverImage(file);
+    setPreviewUrl(URL.createObjectURL(file));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate required fields
-    if (!formData.title || !formData.author || !formData.price || !formData.stock) {
-      setError('Title, author, price, and stock are required.');
+    const requiredFields = ['title', 'author', 'price', 'costPrice', 'stock', 'language', 'productType', 'status'];
+    for (const field of requiredFields) {
+      if (!formData[field]) {
+        toast.error(`"${field}" is required.`);
+        return;
+      }
+    }
+
+    const numPrice = parseFloat(formData.price);
+    const numCostPrice = parseFloat(formData.costPrice);
+    if (numCostPrice > numPrice) {
+      toast.error('Cost Price cannot be higher than selling price.');
       return;
     }
 
     if (selectedCategories.length === 0) {
-      setError('Please select at least one category.');
+      toast.error('Please select at least one category.');
       return;
     }
 
-    // Create FormData object
-    const formDataToSend = new FormData();
-    formDataToSend.append('title', formData.title.trim());
-    formDataToSend.append('author', formData.author.trim());
-    formDataToSend.append('price', parseFloat(formData.price) || 0);
-    formDataToSend.append('stock', parseInt(formData.stock) || 0);
+    try {
+      const formDataToSend = new FormData();
+      Object.entries(formData).forEach(([key, value]) => formDataToSend.append(key, value));
+      selectedCategories.forEach((catId) => formDataToSend.append('categories', catId));
+      if (coverImage) formDataToSend.append('coverImage', coverImage);
 
-    // ✅ Append each selected category ID
-    selectedCategories.forEach(catId => {
-      formDataToSend.append('categories', catId);
-    });
+      await onSubmit(formDataToSend);
 
-    if (coverImage) {
-      formDataToSend.append('coverImage', coverImage);
+      setFormData({
+        title: '',
+        author: '',
+        description: '',
+        price: '',
+        costPrice: '',
+        stock: '',
+        language: '',
+        productType: 'books',
+        status: 'active',
+      });
+      setSelectedCategories([]);
+      setCoverImage(null);
+      setPreviewUrl(null);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to add product. Please try again.');
     }
-
-    onSubmit(formDataToSend);
-
-    // Reset form
-    setFormData({ title: '', author: '', price: '', stock: '' });
-    setSelectedCategories([]);
-    setCoverImage(null);
-    setPreviewUrl(null);
-    setError('');
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" encType="multipart/form-data">
-      <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Add New Book</h2>
+    <div className="flex flex-col h-full max-h-[90vh]">
+      {/* Header */}
+      <h2 className="text-2xl font-semibold text-gray-800 dark:text-white mb-4">Add New Product</h2>
 
-      {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
-          <input
-            type="text"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Author</label>
-          <input
-            type="text"
-            name="author"
-            value={formData.author}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          />
-        </div>
-
-        {/* ✅ Category Multi-Select */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Categories <span className="text-gray-500">(Select one or more)</span>
-          </label>
-          {loadingCategories ? (
-            <p className="mt-1 text-sm text-gray-500">Loading categories...</p>
-          ) : (
-            <select
-              multiple
-              value={selectedCategories}
-              onChange={handleCategoryChange}
-              required
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600 h-32"
-            >
-              {categories.length === 0 ? (
-                <option disabled>No categories available</option>
-              ) : (
-                categories.map(category => (
-                  <option key={category._id} value={category._id}>
-                    {category.name}
-                  </option>
-                ))
-              )}
-            </select>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Price ($)</label>
-          <input
-            type="number"
-            step="0.01"
-            name="price"
-            value={formData.price}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock</label>
-          <input
-            type="number"
-            name="stock"
-            value={formData.stock}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          />
-        </div>
-
-        {/* Image Upload */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image (Optional)</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300"
-          />
-          {previewUrl && (
-            <div className="mt-3 flex items-center gap-4">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="h-20 w-16 object-cover rounded border border-gray-300 dark:border-gray-600"
+      {/* Scrollable Form Content */}
+      <div className="flex-1 overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-5" encType="multipart/form-data">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title *</label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
               />
-              <button
-                type="button"
-                onClick={() => {
-                  setCoverImage(null);
-                  setPreviewUrl(null);
-                }}
-                className="text-red-500 hover:text-red-700 text-sm"
-              >
-                Remove
-              </button>
             </div>
-          )}
-        </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Author *</label>
+              <input
+                type="text"
+                name="author"
+                value={formData.author}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="3"
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language *</label>
+              <select
+                name="language"
+                value={formData.language}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              >
+                <option value="">Select</option>
+                <option value="English">English</option>
+                <option value="Arabic">Arabic</option>
+                <option value="French">French</option>
+                <option value="Somali">Somali</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Type *</label>
+              <select
+                name="productType"
+                value={formData.productType}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              >
+                <option value="books">Books</option>
+                <option value="stationary">Stationary</option>
+                <option value="electronics">Electronics</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status *</label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              >
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Categories *</label>
+              {loadingCategories ? (
+                <p className="mt-1 text-sm text-gray-500">Loading categories...</p>
+              ) : (
+                <select
+                  multiple
+                  value={selectedCategories}
+                  onChange={handleCategoryChange}
+                  className="mt-1 block w-full px-4 py-2 border rounded-lg h-32 dark:bg-gray-700 dark:text-white"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat._id} value={cat._id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Price ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cost Price ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                name="costPrice"
+                value={formData.costPrice}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Stock</label>
+              <input
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleChange}
+                className="mt-1 block w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                required
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image (Optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300"
+              />
+              {previewUrl && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img src={previewUrl} alt="Preview" className="h-20 w-16 object-cover rounded" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverImage(null);
+                      setPreviewUrl(null);
+                    }}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </form>
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
+      {/* Footer Buttons */}
+      <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
         <button
           type="button"
           onClick={onCancel}
-          className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-70"
+          onClick={handleSubmit}
+          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
-          Add Book
+          Add Product
         </button>
       </div>
-    </form>
+    </div>
   );
 };
 

@@ -8,8 +8,7 @@ import FeaturedProducts from '../components/featuredProducts';
 import CartSidebar from '../components/CartSidebar';
 import Footer from '../components/Footer';
 
-import NewsSection from '../components/NewsSection';
-import ReviewCards from '../components/ReviewCards';
+
 
 const UserPage = () => {
   const [cartOpen, setCartOpen] = useState(false);
@@ -110,8 +109,7 @@ const UserPage = () => {
         onClose={toggleCart} 
         cartData={cartData}
       />
-      <NewsSection/>
-      <ReviewCards/>
+     
       <Footer />
     </div>
   );

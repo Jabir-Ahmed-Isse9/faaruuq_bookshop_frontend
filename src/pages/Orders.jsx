@@ -12,7 +12,7 @@ import axios from 'axios';
 const ITEMS_PER_PAGE = 5;
 
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com',
+  baseURL:  import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' }
 });
 

@@ -13,7 +13,7 @@ const ITEMS_PER_PAGE = 5;
 
 // ✅✅✅ FIXED: NO TRAILING SPACES + TOKEN INTERCEPTOR
 const API = axios.create({
-  baseURL: 'https://faaruuqbooks.onrender.com', // ✅ NO TRAILING SPACES — EVER!
+  baseURL:  import.meta.env.VITE_API_URL, // ✅ NO TRAILING SPACES — EVER!
   headers: {
     'Content-Type': 'application/json',
   },

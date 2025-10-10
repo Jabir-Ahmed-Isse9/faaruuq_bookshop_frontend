@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import API from '../api'; // ✅ Ensure path is correct
+// src/pages/CheckOutPage.jsx
+import React, { useState, useEffect } from 'react';
+import API from '../api';
 import { useNavigate } from 'react-router-dom';
 
 const CheckOutPage = ({ cartData }) => {
   const navigate = useNavigate();
+
+  // ✅ NEW: Add cart total state
+  const [cartTotal, setCartTotal] = useState(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -17,6 +21,25 @@ const CheckOutPage = ({ cartData }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // ✅ NEW: Fetch cart total on mount (if not passed via props)
+  useEffect(() => {
+    if (cartData?.total) {
+      setCartTotal(cartData.total);
+      return;
+    }
+
+    const fetchCartTotal = async () => {
+      try {
+        const res = await API.get('/api/v1/cart');
+        setCartTotal(res.data.total || 0);
+      } catch (err) {
+        console.error('Failed to load cart total');
+        setCartTotal(0);
+      }
+    };
+    fetchCartTotal();
+  }, [cartData]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -28,7 +51,6 @@ const CheckOutPage = ({ cartData }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ Validate required fields
     if (
       !formData.fullName ||
       !formData.phone ||
@@ -40,7 +62,6 @@ const CheckOutPage = ({ cartData }) => {
       return;
     }
 
-    // ✅ Validate Somali mobile format
     const phoneRegex = /^(\+?252)?6[0-9]{8}$/;
     if (!phoneRegex.test(formData.phone)) {
       setError(
@@ -49,7 +70,6 @@ const CheckOutPage = ({ cartData }) => {
       return;
     }
 
-    // ✅ Normalize phone: always ensure +252 prefix
     const normalizedPhone = formData.phone.startsWith('+252')
       ? formData.phone
       : `+252${formData.phone.startsWith('6') ? formData.phone : '6' + formData.phone}`;
@@ -58,7 +78,6 @@ const CheckOutPage = ({ cartData }) => {
     setError('');
 
     try {
-      // 1. Create order
       const res = await API.post('/api/v1/orders', {
         shippingAddress: {
           label: 'Home',
@@ -74,17 +93,15 @@ const CheckOutPage = ({ cartData }) => {
       const orderId = res.data.orderId;
       localStorage.setItem('lastOrderId', orderId);
 
-      // 2. Initiate payment (NO redirect to Waafi, just backend call)
       const payRes = await API.post(`/api/v1/orders/${orderId}/pay`);
 
       if (!payRes.data.success) {
         throw new Error(payRes.data.error);
       }
 
-      // 3. Navigate to success page
       navigate('/payment-success', {
         state: {
-          orderId: orderId,
+          orderId,
           message: payRes.data.message,
           waafiResponse: payRes.data.waafiResponse,
         },
@@ -103,6 +120,15 @@ const CheckOutPage = ({ cartData }) => {
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6 text-center">
           Complete Your Order
         </h2>
+
+        {/* ✅ NEW: Show cart total */}
+        {cartTotal !== null && (
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              Total to pay: <span className="font-bold">${parseFloat(cartTotal).toFixed(2)}</span>
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm mb-4">
@@ -214,7 +240,6 @@ const CheckOutPage = ({ cartData }) => {
             )}
           </button>
 
-          {/* Back */}
           <button
             type="button"
             onClick={() => navigate('/')}

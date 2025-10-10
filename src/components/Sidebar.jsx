@@ -1,6 +1,7 @@
 import { useTheme } from '../utils/themeContext';
 import { useSidebar } from '../utils/sidebarContext';
 import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 
 import {
   HomeIcon,
@@ -10,17 +11,32 @@ import {
   ChartBarIcon,
   ShoppingCartIcon, 
   Squares2X2Icon,
+  ChevronRightIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 
-// ✅ Updated: Paths are now relative to /dashboard
+// ✅ Updated navigation with nested reports
 const navigation = [
   { name: 'Dashboard', path: '/dashboard', icon: HomeIcon },
   { name: 'Books', path: '/dashboard/books', icon: BookOpenIcon },
-  { name: 'Categories', path: '/dashboard/Categories', icon: Squares2X2Icon },
+  { name: 'Categories', path: '/dashboard/categories', icon: Squares2X2Icon },
   { name: 'Orders', path: '/dashboard/orders', icon: ShoppingCartIcon },
-  { name: 'coupons', path: '/dashboard/coupons', icon: ShoppingCartIcon },
+  { name: 'Coupons', path: '/dashboard/coupons', icon: ShoppingCartIcon },
   { name: 'User Management', path: '/dashboard/users', icon: UsersIcon },
-  { name: 'Reports', path: '/dashboard/reports', icon: ChartBarIcon },
+  
+  // 📊 Nested Reports
+  {
+    name: 'Reports',
+    icon: ChartBarIcon,
+    children: [
+      { name: 'Overview', path: '/dashboard/reports' },
+      { name: 'Sales Summary', path: '/dashboard/reports/sales' },
+      { name: 'Top Books', path: '/dashboard/reports/books' },
+      { name: 'Customers', path: '/dashboard/reports/customers' },
+      { name: 'Languages report', path: '/dashboard/reports/languages' },
+    ]
+  },
+  
   { name: 'Settings', path: '/dashboard/settings', icon: CogIcon },
 ];
 
@@ -28,6 +44,17 @@ const Sidebar = () => {
   const { darkMode, toggleDarkMode } = useTheme();
   const { isCollapsed, toggleSidebar } = useSidebar();
   const location = useLocation();
+  const [openSections, setOpenSections] = useState({ reports: false });
+
+  // Check if current path is under reports
+  const isReportsActive = location.pathname.startsWith('/dashboard/reports');
+
+  const toggleSection = (section) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   return (
     <div
@@ -68,10 +95,69 @@ const Sidebar = () => {
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const hasChildren = item.children;
 
-            // ✅ Improved: Check if current path matches (supports nested routes)
+            if (hasChildren) {
+              const isActive = isReportsActive;
+              const isExpanded = openSections.reports;
+
+              return (
+                <div key={item.name}>
+                  {/* Parent Item */}
+                  <button
+                    onClick={() => toggleSection('reports')}
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg group ${
+                      isActive
+                        ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-5 h-5" />
+                      {!isCollapsed && <span className="text-sm font-medium">{item.name}</span>}
+                    </div>
+                    
+                    {!isCollapsed && (
+                      <span className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                        <ChevronRightIcon className="w-4 h-4" />
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Children (only show when expanded & not collapsed) */}
+                  {!isCollapsed && isExpanded && (
+                    <div className="ml-10 mt-1 space-y-1">
+                      {item.children.map((child) => {
+                        const isChildActive = location.pathname === child.path;
+                        return (
+                          <Link
+                            key={child.path}
+                            to={child.path}
+                            className={`block px-3 py-1.5 text-sm rounded-lg ${
+                              isChildActive
+                                ? 'bg-indigo-50 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 font-medium'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Tooltip when collapsed */}
+                  {isCollapsed && (
+                    <span className="absolute left-16 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap transition-opacity duration-200">
+                      {item.name}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+
+            // Regular item (no children)
             const isActive = location.pathname === item.path;
-
             return (
               <Link
                 key={item.name}
@@ -85,7 +171,6 @@ const Sidebar = () => {
                 <Icon className="w-5 h-5" />
                 {!isCollapsed && <span className="text-sm font-medium">{item.name}</span>}
 
-                {/* Tooltip when collapsed */}
                 {isCollapsed && (
                   <span className="absolute left-16 bg-gray-800 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none z-50 whitespace-nowrap transition-opacity duration-200">
                     {item.name}
