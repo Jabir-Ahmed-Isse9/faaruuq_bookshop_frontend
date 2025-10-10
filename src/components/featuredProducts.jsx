@@ -24,9 +24,11 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
     const fetchCategories = async () => {
       try {
         const res = await API.get('/api/v1/categories');
-        setCategories(res.data || []);
+        // ✅ SAFETY: ensure array
+        setCategories(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Fetch categories error:", err);
+        setCategories([]);
       }
     };
     fetchCategories();
@@ -46,9 +48,10 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
         }
 
         const res = await API.get(url);
+        const booksArray = Array.isArray(res.data.books) ? res.data.books : [];
 
-        const activeBooks = (res.data.books || []).filter(book => 
-          book.status === 'active' && book.productType === 'books'
+        const activeBooks = booksArray.filter(book =>
+          book?.status === 'active' && book?.productType === 'books'
         );
 
         const booksWithReviews = await Promise.all(
@@ -56,13 +59,13 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
             try {
               const reviews = await ReviewAPI.getReviewsByBook(book._id);
               const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
-              const avg = reviews.length > 0 ? totalRating / reviews.length : 0;
+              const avg = reviews.length ? totalRating / reviews.length : 0;
               return {
                 ...book,
                 ratingAvg: parseFloat(avg.toFixed(1)),
                 ratingCount: reviews.length,
               };
-            } catch (err) {
+            } catch {
               return { ...book, ratingAvg: 0, ratingCount: 0 };
             }
           })
@@ -110,7 +113,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
       await ReviewAPI.createReview(bookId, { rating });
       const reviews = await ReviewAPI.getReviewsByBook(bookId);
       const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
-      const avg = reviews.length > 0 ? totalRating / reviews.length : 0;
+      const avg = reviews.length ? totalRating / reviews.length : 0;
       setBooks(prev =>
         prev.map(book =>
           book._id === bookId
@@ -178,7 +181,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           <div className="mb-6">
             <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Languages</h4>
             <div className="space-y-2">
-              {languages.map((lang, i) => (
+              {Array.isArray(languages) && languages.map((lang, i) => (
                 <label key={i} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 transition">
                   <input
                     type="checkbox"
@@ -194,7 +197,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           <div>
             <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Categories</h4>
             <div className="space-y-2">
-              {categories.map((cat) => (
+              {Array.isArray(categories) && categories.map((cat) => (
                 <label key={cat._id} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 transition">
                   <input
                     type="checkbox"
@@ -209,74 +212,71 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           </div>
         </aside>
 
-        {/* Book Cards - ONLY 4 BOOKS */}
+        {/* Book Cards */}
         <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {books.length === 0 ? (
+          {Array.isArray(books) && books.length > 0 ? books.map((book) => (
+            <Link key={book._id} to={`/book/${book._id}`} className="block h-full">
+              <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 overflow-hidden h-80 flex flex-col">
+                <div className="h-40 sm:h-56 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
+                  <img
+                    src={book.coverUrl || "https://via.placeholder.com/300x400?text=No+Cover"}
+                    alt={book.title}
+                    className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/300x400/374151/9ca3af?text=No+Image";
+                    }}
+                  />
+                </div>
+                <div className="p-3 flex flex-col flex-grow justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm line-clamp-2">{book.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">{book.author}</p>
+                    <p className="text-blue-700 dark:text-blue-400 font-bold text-sm mt-1">$ {parseFloat(book.price).toFixed(2)}</p>
+                    {renderStars(book._id, book.ratingAvg, book.ratingCount)}
+                  </div>
+                  <div className="flex gap-2 mt-2" onClick={(e) => e.preventDefault()}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onAddToCart && book.stock > 0) {
+                          onAddToCart(book);
+                          alert(`"${book.title}" added to cart!`);
+                        }
+                      }}
+                      disabled={isAdding || book.stock <= 0}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        book.stock <= 0
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
+                          : 'bg-blue-700 text-white hover:bg-blue-800 dark:hover:bg-blue-600 disabled:opacity-50'
+                      }`}
+                    >
+                      {isAdding ? 'Adding...' : book.stock <= 0 ? 'Out of Stock' : 'Add'}
+                    </button>
+
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (book.stock <= 0) return;
+                        try {
+                          await API.post('/api/v1/cart', { bookId: book._id, qty: 1 });
+                          navigate('/checkout');
+                        } catch {
+                          alert('Failed to add to cart');
+                        }
+                      }}
+                      disabled={book.stock <= 0}
+                      className="flex-1 border border-blue-700 text-blue-700 dark:text-blue-400 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      Buy
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )) : (
             <div className="col-span-full flex justify-center py-12 text-gray-500 dark:text-gray-400">
               No books available
             </div>
-          ) : (
-            books.map((book) => (
-              <Link key={book._id} to={`/book/${book._id}`} className="block h-full">
-                <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 overflow-hidden h-80 flex flex-col">
-                  {/* ✅ IMAGE FIXED FOR MOBILE */}
-                  <div className="h-40 sm:h-48 md:h-56 lg:h-40 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
-                    <img
-                      src={book.coverUrl || "https://via.placeholder.com/300x400?text=No+Cover"}
-                      alt={book.title}
-                      className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-105"
-                      onError={(e) => {
-                        e.target.src = "https://via.placeholder.com/300x400/374151/9ca3af?text=No+Image";
-                      }}
-                    />
-                  </div>
-                  <div className="p-3 flex flex-col flex-grow justify-between">
-                    <div>
-                      <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm line-clamp-2">{book.title}</h3>
-                      <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">{book.author}</p>
-                      <p className="text-blue-700 dark:text-blue-400 font-bold text-sm mt-1">$ {parseFloat(book.price).toFixed(2)}</p>
-                      {renderStars(book._id, book.ratingAvg, book.ratingCount)}
-                    </div>
-                    <div className="flex gap-2 mt-2" onClick={(e) => e.preventDefault()}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onAddToCart && book.stock > 0) {
-                            onAddToCart(book);
-                            alert(`"${book.title}" added to cart!`);
-                          }
-                        }}
-                        disabled={isAdding || book.stock <= 0}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                          book.stock <= 0
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500'
-                            : 'bg-blue-700 text-white hover:bg-blue-800 dark:hover:bg-blue-600 disabled:opacity-50'
-                        }`}
-                      >
-                        {isAdding ? 'Adding...' : book.stock <= 0 ? 'Out of Stock' : 'Add'}
-                      </button>
-
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (book.stock <= 0) return;
-                          try {
-                            await API.post('/api/v1/cart', { bookId: book._id, qty: 1 });
-                            navigate('/checkout');
-                          } catch (err) {
-                            alert('Failed to add to cart');
-                          }
-                        }}
-                        disabled={book.stock <= 0}
-                        className="flex-1 border border-blue-700 text-blue-700 dark:text-blue-400 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      >
-                        Buy
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))
           )}
         </div>
       </div>
