@@ -20,11 +20,13 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
   const user = JSON.parse(localStorage.getItem('user'));
   const isLoggedIn = !!user;
 
+  // Fetch categories safely
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await API.get('/api/v1/categories');
-        setCategories(res.data || []);
+        // Ensure res.data is an array
+        setCategories(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Fetch categories error:", err);
       }
@@ -32,11 +34,11 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
     fetchCategories();
   }, []);
 
+  // Fetch books safely
   useEffect(() => {
     const fetchBooks = async () => {
       try {
         setLoading(true);
-        // ✅ Fetch books with productType=books
         let url = `/api/v1/books?productType=books&limit=50`;
 
         if (selectedCategories.length > 0) {
@@ -48,9 +50,10 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
 
         const res = await API.get(url);
 
-        // ✅ Filter active books with productType=books (extra safety)
-        const activeBooks = (res.data.books || []).filter(book => 
-          book.status === 'active' && book.productType === 'books'
+        const allBooks = Array.isArray(res.data.books) ? res.data.books : [];
+
+        const activeBooks = allBooks.filter(
+          book => book?.status === 'active' && book?.productType === 'books'
         );
 
         const booksWithReviews = await Promise.all(
@@ -58,27 +61,19 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
             try {
               const reviews = await ReviewAPI.getReviewsByBook(book._id);
               const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
-              const avg = reviews.length > 0 ? totalRating / reviews.length : 0;
-              return {
-                ...book,
-                ratingAvg: parseFloat(avg.toFixed(1)),
-                ratingCount: reviews.length,
-              };
+              const avg = reviews.length ? totalRating / reviews.length : 0;
+              return { ...book, ratingAvg: parseFloat(avg.toFixed(1)), ratingCount: reviews.length };
             } catch (err) {
               return { ...book, ratingAvg: 0, ratingCount: 0 };
             }
           })
         );
 
-        // ✅ SORT BY RATING (highest first) + review count as tiebreaker
         const sortedBooks = booksWithReviews.sort((a, b) => {
-          if (b.ratingAvg !== a.ratingAvg) {
-            return b.ratingAvg - a.ratingAvg;
-          }
-          return b.ratingCount - a.ratingCount; // More reviews first
+          if (b.ratingAvg !== a.ratingAvg) return b.ratingAvg - a.ratingAvg;
+          return b.ratingCount - a.ratingCount;
         });
 
-        // ✅ TAKE ONLY TOP 4
         setBooks(sortedBooks.slice(0, 4));
       } catch (err) {
         console.error("Fetch books error:", err);
@@ -116,7 +111,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
       await ReviewAPI.createReview(bookId, { rating });
       const reviews = await ReviewAPI.getReviewsByBook(bookId);
       const totalRating = reviews.reduce((sum, r) => sum + r.rating, 0);
-      const avg = reviews.length > 0 ? totalRating / reviews.length : 0;
+      const avg = reviews.length ? totalRating / reviews.length : 0;
       setBooks(prev =>
         prev.map(book =>
           book._id === bookId
@@ -171,7 +166,6 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
     <main className="max-w-7xl mx-auto px-4 py-8 text-gray-800 dark:text-gray-200">
       <h2 className="text-2xl font-bold text-blue-900 mb-6 text-center dark:text-blue-400">Featured Books</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Filters Sidebar */}
         <aside className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm h-fit sticky top-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Filters</h3>
@@ -200,7 +194,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           <div>
             <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Categories</h4>
             <div className="space-y-2">
-              {categories.map((cat) => (
+              {Array.isArray(categories) && categories.map((cat) => (
                 <label key={cat._id} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 transition">
                   <input
                     type="checkbox"
@@ -215,7 +209,6 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           </div>
         </aside>
 
-        {/* Book Cards - ONLY 4 BOOKS */}
         <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {books.length === 0 ? (
             <div className="col-span-full flex justify-center py-12 text-gray-500 dark:text-gray-400">
@@ -225,13 +218,12 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
             books.map((book) => (
               <Link key={book._id} to={`/book/${book._id}`} className="block h-full">
                 <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 overflow-hidden h-80 flex flex-col">
-                  <div className="h-40 overflow-hidden bg-gray-50 dark:bg-gray-700">
+                  <div className="h-40 sm:h-48 md:h-56 lg:h-40 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
                     <img
                       src={book.coverUrl || "https://via.placeholder.com/300x400?text=No+Cover"}
                       alt={book.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-105"
                       onError={(e) => {
-                        // ✅ FIXED: Removed extra spaces
                         e.target.src = "https://via.placeholder.com/300x400/374151/9ca3af?text=No+Image";
                       }}
                     />
@@ -243,10 +235,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
                       <p className="text-blue-700 dark:text-blue-400 font-bold text-sm mt-1">$ {parseFloat(book.price).toFixed(2)}</p>
                       {renderStars(book._id, book.ratingAvg, book.ratingCount)}
                     </div>
-                    <div 
-                      className="flex gap-2 mt-2"
-                      onClick={(e) => e.preventDefault()}
-                    >
+                    <div className="flex gap-2 mt-2" onClick={(e) => e.preventDefault()}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
