@@ -58,7 +58,7 @@ const Footer = () => {
             </a>
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400 text-center sm:text-right">
-            © {new Date().getFullYear()} FAARUUQ Books. All rights reserved.
+            © {new Date().getFullYear()} FAARUUQ Books. All rights reserved. By jaabirshuuke26@gmail.com
           </div>
         </div>
       </div>

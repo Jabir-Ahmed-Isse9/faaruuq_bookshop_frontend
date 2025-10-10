@@ -36,7 +36,6 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
     const fetchBooks = async () => {
       try {
         setLoading(true);
-        // ✅ Fetch books with productType=books
         let url = `/api/v1/books?productType=books&limit=50`;
 
         if (selectedCategories.length > 0) {
@@ -48,7 +47,6 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
 
         const res = await API.get(url);
 
-        // ✅ Filter active books with productType=books (extra safety)
         const activeBooks = (res.data.books || []).filter(book => 
           book.status === 'active' && book.productType === 'books'
         );
@@ -70,15 +68,11 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
           })
         );
 
-        // ✅ SORT BY RATING (highest first) + review count as tiebreaker
         const sortedBooks = booksWithReviews.sort((a, b) => {
-          if (b.ratingAvg !== a.ratingAvg) {
-            return b.ratingAvg - a.ratingAvg;
-          }
-          return b.ratingCount - a.ratingCount; // More reviews first
+          if (b.ratingAvg !== a.ratingAvg) return b.ratingAvg - a.ratingAvg;
+          return b.ratingCount - a.ratingCount;
         });
 
-        // ✅ TAKE ONLY TOP 4
         setBooks(sortedBooks.slice(0, 4));
       } catch (err) {
         console.error("Fetch books error:", err);
@@ -225,13 +219,13 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
             books.map((book) => (
               <Link key={book._id} to={`/book/${book._id}`} className="block h-full">
                 <div className="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-gray-100 dark:border-gray-700 overflow-hidden h-80 flex flex-col">
-                  <div className="h-40 overflow-hidden bg-gray-50 dark:bg-gray-700">
+                  {/* ✅ IMAGE FIXED FOR MOBILE */}
+                  <div className="h-40 sm:h-48 md:h-56 lg:h-40 overflow-hidden bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
                     <img
                       src={book.coverUrl || "https://via.placeholder.com/300x400?text=No+Cover"}
                       alt={book.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="w-full h-full object-contain sm:object-cover transition-transform duration-500 group-hover:scale-105"
                       onError={(e) => {
-                        // ✅ FIXED: Removed extra spaces
                         e.target.src = "https://via.placeholder.com/300x400/374151/9ca3af?text=No+Image";
                       }}
                     />
@@ -243,10 +237,7 @@ const FeaturedProducts = ({ onAddToCart, isAdding = false }) => {
                       <p className="text-blue-700 dark:text-blue-400 font-bold text-sm mt-1">$ {parseFloat(book.price).toFixed(2)}</p>
                       {renderStars(book._id, book.ratingAvg, book.ratingCount)}
                     </div>
-                    <div 
-                      className="flex gap-2 mt-2"
-                      onClick={(e) => e.preventDefault()}
-                    >
+                    <div className="flex gap-2 mt-2" onClick={(e) => e.preventDefault()}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
