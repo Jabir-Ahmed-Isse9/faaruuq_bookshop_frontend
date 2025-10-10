@@ -187,7 +187,7 @@ const Header = ({ isDarkMode, toggleDarkMode }) => {
             ) : (
               <li>
                 <Link
-                  to="/signin"
+                  to="/login"
                   className="hover:text-blue-700 dark:hover:text-blue-400 text-gray-700 dark:text-gray-300"
                 >
                   Sign in
