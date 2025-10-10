@@ -147,7 +147,7 @@ const CheckOutPage = ({ cartData }) => {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
-              placeholder="John Doe"
+              placeholder="yahye abdullahi abdi"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -163,14 +163,14 @@ const CheckOutPage = ({ cartData }) => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              placeholder="611234567"
+              placeholder="614270702"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               pattern="^(\+?252)?6[0-9]{8}$"
               title="Enter Somali mobile number like 611234567 or +252611234567"
               required
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Example: 611234567 or +252611234567
+              Example: 614270702 or +252614270702
             </p>
           </div>
 
@@ -184,7 +184,7 @@ const CheckOutPage = ({ cartData }) => {
               name="street"
               value={formData.street}
               onChange={handleChange}
-              placeholder="22 July St"
+              placeholder="warshadaha street"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
